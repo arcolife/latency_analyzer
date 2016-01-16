@@ -38,7 +38,7 @@
     </disk>
     <disk type='block' device='disk'>
       <driver name='qemu' type='qcow2' cache='none' io='threads' iothread='2'/>
-      <source dev='/home/arcolife/workspace/utils/RH/kvm_io/dumps/vm1.disk1.qcow2'/>
+      <source dev='/src/vm1.disk1.qcow2'/>
       <target dev='vdc' bus='virtio'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
     </disk>
