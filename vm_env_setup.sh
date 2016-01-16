@@ -82,10 +82,12 @@ install_requirements(){
 	git clone https://github.com/psuriset/kvm_io.git ${PROJECT_ROOT%/}/kvm_io
 
 	# install blockIO trace/debug tools
-	# perf trace
 	# strace
+	# perf trace
 	# perf record
 	# perf trace record
+	# pbench installs perf; but just to be sure..
+	dnf install -y strace perf
 
 	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
 
