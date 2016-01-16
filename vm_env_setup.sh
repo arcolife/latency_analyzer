@@ -96,18 +96,19 @@ bootstrap_it(){
 	qemu-img create -f qcow2 $QCOW_FILE_PATH 2G	
 	virsh define $XML_PATH
 	virsh start vm1
-	if [[ -z $(virsh list | grep vm1) ]]; then
+	if [[ $(virsh list | grep vm1) ]]; then
+		PID=`pgrep qemu-system-x86 | tail -n 1`
+		echo $PID
 		virsh save vm1 ${PROJECT_ROOT%/}/vm1_snapshot
-		# virsh restore ${PROJECT_ROOT%/}/vm1_snapshot
-		echo -e "\e[1;42m vm1 is now running. \e[0m"
+		echo -e "\e[1;42m vm1 was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
 	else
 		echo -e "\e[1;31m FAILED! vm1 couldn't start up. \e[0m"
 		exit 1
 	fi
-	PID=`pgrep qemu-system-x86 | tail -n 1`
 }
 
 attach_disk(){
+	virsh restore ${PROJECT_ROOT%/}/vm1_snapshot
 	# use kvm_io
 	echo
 }
@@ -123,7 +124,7 @@ process_data(){
 }
 
 install_requirements
-# bootstrap_it
+bootstrap_it
 # attach_disk
 # run_workload
 # process_data
