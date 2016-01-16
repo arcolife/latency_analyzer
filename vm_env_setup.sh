@@ -11,8 +11,8 @@ echo `ps -aef | grep qemu-system-x86`
 CLIENTS=''
 
 user_interrupt(){
-    echo -e "\n\nKeyboard Interrupt detected."
-    echo -e "Stopping KVM env bootstrap script..."
+    echo -e "\e[1;31m \n\nKeyboard Interrupt detected. \e[0m"
+    echo -e "\e[1;31m Stopping KVM env bootstrap script... \e[0m"
     exit
 }
 
@@ -25,14 +25,15 @@ cleanup(){
 }
 
 install_requirements(){
+	echo -e "\e[1;33m Initiating requirements installation..\e[0m\n"
 	# create project location and download vm1.xml 
 	mkdir $PROJECT_ROOT
 	dnf install -y wget
-	wget https://raw.githubusercontent.com/arcolife/latency_analyzer/master/vm1.xml -O $XML_PATH
+	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/vm1.xml -O $XML_PATH
 	if [ -f $XML_PATH ]; then
-		echo "$PROJECT_ROOT was created; VM's XML definition saved to $XML_PATH.."
+		echo -e "\e[1;42m $PROJECT_ROOT was created; VM's XML definition saved to $XML_PATH.. \e[0m"
 	else
-		echo "failed to create $XML_PATH"
+		echo -e "\e[1;31m failed to create $XML_PATH \e[0m"
 		exit 1
 	fi
 
@@ -41,10 +42,10 @@ install_requirements(){
 	systemctl start libvirtd
 	systemctl enable libvirtd
 	virsh --version
-	if [ $? -eq 0]; then
-		echo "virtualization components have been installed.."
+	if [ $? -eq 0 ]; then
+		echo -e "\e[1;42m virtualization components installed.. \e[0m"
 	else
-		echo "FAILED! virtualization modules could not be installed.."
+		echo -e "\e[1;31m FAILED! virtualization modules could not be installed.. \e[0m"
 		exit 1
 	fi
 
@@ -59,21 +60,20 @@ install_requirements(){
 	source /etc/profile.d/pbench-agent.sh
 	register-tool-set
 	which pbench_fio
-	if [ $? -eq 0]; then
-		echo "Pbench has been installed.."
+	if [ $? -eq 0 ]; then
+		echo -e "\e[1;42m pbench/fio installed.. \e[0m"
 	else
-		echo "FAILED! Pbench could not be installed.."
+		echo -e "\e[1;31m FAILED! Pbench could not be installed.. \e[0m"
 		exit 1
 	fi
 
 	# install perf-script-postprocessor
-	dnf install -y python2-pip
-	pip2 install -y perf-script-postprocessor
-	if [ $? -eq 0]; then
-		echo $(perf_script_postprocessor -h)
-		echo "perf-script-postprocessor has been installed.."
+	pip2 install -q perf-script-postprocessor
+	if [ $? -eq 0 ]; then
+		echo $(perf_script_processor -h)
+		echo -e "\e[1;42m perf-script-postprocessor installed.. \e[0m"
 	else
-		echo "FAILED! perf-script-postprocessor could not be installed.."
+		echo -e "\e[1;31m FAILED! perf-script-postprocessor could not be installed.. \e[0m"
 		exit 1
 	fi
 
@@ -87,6 +87,8 @@ install_requirements(){
 	# perf record
 	# perf trace record
 
+	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
+
 }
 
 bootstrap_it(){
@@ -97,9 +99,9 @@ bootstrap_it(){
 	if [[ -z $(virsh list | grep vm1) ]]; then
 		virsh save vm1 ${PROJECT_ROOT%/}/vm1_snapshot
 		# virsh restore ${PROJECT_ROOT%/}/vm1_snapshot
-		echo "vm1 is now running."
+		echo -e "\e[1;42m vm1 is now running. \e[0m"
 	else
-		echo "FAILED! vm1 couldn't start up."
+		echo -e "\e[1;31m FAILED! vm1 couldn't start up. \e[0m"
 		exit 1
 	fi
 	PID=`pgrep qemu-system-x86 | tail -n 1`
