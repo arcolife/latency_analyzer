@@ -24,8 +24,12 @@ cleanup(){
 }
 
 install_requirements(){
+	# create project location
+	mkdir $PROJECT_ROOT
+	echo "$PROJECT_ROOT was created.."
+	
 	# install virsh components
-	dnf install @virtualization
+	dnf install -y @virtualization
 	systemctl start libvirtd
 	systemctl enable libvirtd
 	virsh --version
@@ -36,12 +40,16 @@ install_requirements(){
 		exit 1
 	fi
 
-	# install pbench
-	dnf config-manager --add-repo https://copr.fedoraproject.org/coprs/ndokos/pbench/repo/fedora-23/ndokos-pbench-fedora-23.repo
-	# dnf update
-	dnf install pbench-agent
-	dnf install pbench-fio
+	# install pbench and fio
+	dnf install -y dnf-plugins-core
+	dnf copr enable -y ndokos/configtools
+	dnf copr enable -y ndokos/pbench
+	dnf install -y pbench-agent
+	dnf install -y pbench-fio
+	sed -i 's/ver=2.2.5/ver=2.2.8/g' /opt/pbench-agent/bench-scripts/pbench_fio
+	source /etc/profile.d/pbench-agent.sh
 	register-tool-set
+	which pbench_fio
 	if [ $? -eq 0]; then
 		echo "Pbench has been installed.."
 	else
@@ -50,8 +58,8 @@ install_requirements(){
 	fi
 
 	# install perf-script-postprocessor
-	dnf install python2-pip
-	pip2 install perf-script-postprocessor
+	dnf install -y python2-pip
+	pip2 install -y perf-script-postprocessor
 	if [ $? -eq 0]; then
 		echo $(perf_script_postprocessor -h)
 		echo "perf-script-postprocessor has been installed.."
@@ -61,18 +69,21 @@ install_requirements(){
 	fi
 
 	# setup git and clone https://github.com/psuriset/kvm_io.git
-	dnf install git 
+	dnf install -y git 
 	git clone https://github.com/psuriset/kvm_io.git ${PROJECT_ROOT%/}/kvm_io
 
 	# install blockIO trace/debug tools
+	# perf trace
+	# strace
+	# perf record
+	# perf trace record
 
 }
 
 bootstrap_it(){
-	mkdir $PROJECT_ROOT
 	qemu-img create -f qcow2 $TEST_IMG_PATH 1G	
 	virsh define $XML_PATH
-	virsh start $XML_PATH
+	virsh start vm1
 	if[[ -z $(virsh list | grep vm1) ]]; then
 		virsh save vm1 ${PROJECT_ROOT%/}/vm1_snapshot
 		# virsh restore ${PROJECT_ROOT%/}/vm1_snapshot
@@ -98,7 +109,7 @@ process_data(){
 	# see if we can graph the results nicely
 }
 
-# install_requirements
+install_requirements
 # bootstrap_it
 # attach_disk
 # run_workload
