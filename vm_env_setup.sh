@@ -5,24 +5,25 @@ QCOW_FILE_PATH='/var/lib/libvirt/images/vm1.qcow2'
 QCOW_BLOCK_PATH=${PROJECT_ROOT%/}/vm1.disk1.qcow2
 XML_PATH="${PROJECT_ROOT%/}/vm1.xml"
 
-echo `ps -aef | grep qemu-system-x86`
-
 # define client name here, ex: virbr0-xxx-xx
 CLIENTS=''
+
+echo `ps -aef | grep qemu-system-x86`
+
+cleanup(){
+	echo "cleaning up; removing ${PROJECT_ROOT%/}/<related files>.."
+	rm -rf ${PROJECT_ROOT%/}/{kvm_io/,vm1.disk1.qcow2,vm1_snapshot,vm1.xml}
+}
 
 user_interrupt(){
     echo -e "\e[1;31m \n\nKeyboard Interrupt detected. \e[0m"
     echo -e "\e[1;31m Stopping KVM env bootstrap script... \e[0m"
-    exit
+    cleanup
+    exit 1
 }
 
 trap user_interrupt SIGINT
 trap user_interrupt SIGTSTP
-
-cleanup(){
-	echo "cleaning up.."
-	rm -f ${PROJECT_ROOT%/}/vm1_snapshot
-}
 
 install_requirements(){
 	echo -e "\e[1;33m Initiating requirements installation..\e[0m\n"
