@@ -26,10 +26,11 @@ trap user_interrupt SIGINT
 trap user_interrupt SIGTSTP
 
 install_requirements(){
-	echo -e "\e[1;33m Initiating requirements installation..\e[0m\n"
+	cleanup
+	echo -e "\e[1;33m Initiating requirements installation..\e[0m"
 	# create project location and download vm1.xml 
 	mkdir $PROJECT_ROOT
-	dnf install -y wget
+	dnf install -q -y wget
 	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/vm1.xml -O $XML_PATH
 	if [ -f $XML_PATH ]; then
 		echo -e "\e[1;42m $PROJECT_ROOT was created; VM's XML definition saved to $XML_PATH.. \e[0m"
@@ -39,7 +40,7 @@ install_requirements(){
 	fi
 
 	# install virsh components
-	dnf install -y @virtualization
+	dnf install -q -y @virtualization
 	systemctl start libvirtd
 	systemctl enable libvirtd
 	virsh --version
@@ -51,12 +52,12 @@ install_requirements(){
 	fi
 
 	# install pbench and fio
-	dnf install -y dnf-plugins-core
+	dnf install -q -y dnf-plugins-core
 	dnf copr enable -y ndokos/configtools
 	dnf copr enable -y ndokos/pbench
-	# for testing in containers, use --nogpgcheck with dnf install of COPR repos
-	dnf install -y pbench-agent
-	dnf install -y pbench-fio
+	# for testing in containers, use --nogpgcheck with dnf install -q of COPR repos
+	dnf install -q -y pbench-agent
+	dnf install -q -y pbench-fio
 	sed -i 's/ver=2.2.5/ver=2.2.8/g' /opt/pbench-agent/bench-scripts/pbench_fio
 	source /etc/profile.d/pbench-agent.sh
 	register-tool-set
@@ -70,8 +71,8 @@ install_requirements(){
 
 	# install perf-script-postprocessor
 	pip2 install -q perf-script-postprocessor
+	perf_script_processor -h
 	if [ $? -eq 0 ]; then
-		echo $(perf_script_processor -h)
 		echo -e "\e[1;42m perf-script-postprocessor installed.. \e[0m"
 	else
 		echo -e "\e[1;31m FAILED! perf-script-postprocessor could not be installed.. \e[0m"
@@ -79,30 +80,40 @@ install_requirements(){
 	fi
 
 	# setup git and clone https://github.com/psuriset/kvm_io.git
-	dnf install -y git 
-	git clone https://github.com/psuriset/kvm_io.git ${PROJECT_ROOT%/}/kvm_io
+	dnf install -q -y git 
+	git clone -q https://github.com/psuriset/kvm_io.git ${PROJECT_ROOT%/}/kvm_io
+	if [ -f ${PROJECT_ROOT%/}/kvm_io/bench_iter.sh ]; then
+		echo -e "\e[1;42m ${PROJECT_ROOT%/}/kvm_io was created.. \e[0m"
+	else
+		echo -e "\e[1;31m failed to create ${PROJECT_ROOT%/}/kvm_io \e[0m"
+		exit 1
+	fi
 
 	# install blockIO trace/debug tools
-	# strace
-	# perf trace
-	# perf record
-	# perf trace record
+	# strace, perf trace, perf record, perf trace record
 	# pbench installs perf; but just to be sure..
-	dnf install -y strace perf
+	dnf install -q -y strace perf
+	xx=`perf --help && strace -h`
+	if [ $? -eq 0 ]; then
+		echo -e "\e[1;42m Debuggers: perf & strace installed.. \e[0m"
+	else
+		echo -e "\e[1;31m FAILED! perf/strace could not be installed.. \e[0m"
+		exit 1
+	fi
 
 	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
 
 }
 
 bootstrap_it(){
-	qemu-img create -f qcow2 $QCOW_BLOCK_PATH 2G	
-	qemu-img create -f qcow2 $QCOW_FILE_PATH 2G	
-	virsh define $XML_PATH
-	virsh start vm1
+	qemu-img create -q -f qcow2 $QCOW_BLOCK_PATH 2G	
+	qemu-img create -q -f qcow2 $QCOW_FILE_PATH 2G	
+	virsh -q define $XML_PATH
+	virsh -q start vm1
 	if [[ $(virsh list | grep vm1) ]]; then
 		PID=`pgrep qemu-system-x86 | tail -n 1`
 		echo $PID
-		virsh save vm1 ${PROJECT_ROOT%/}/vm1_snapshot
+		virsh -q save vm1 ${PROJECT_ROOT%/}/vm1_snapshot
 		echo -e "\e[1;42m vm1 was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
 	else
 		echo -e "\e[1;31m FAILED! vm1 couldn't start up. \e[0m"
