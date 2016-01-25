@@ -118,6 +118,7 @@ bootstrap_it(){
 
 	# virsh destroy $vm
 	# virsh undefine $vm
+	# virsh -q define $XML_PATH
 
 	qemu-img create -q -f qcow2 $IMAGE_PATH 10G
 	virt-install --name=$vm \
@@ -139,20 +140,35 @@ bootstrap_it(){
 	# dnf install libguestfs-tools-c
 	# virt-builder fedora-23 -o /var/lib/libvirt/images/$vm.qcow2 --format qcow2 --update --selinux-relabel --size 5G
 	         
-	qemu-img create -q -f qcow2 $DISK_PATH 500M
-	# virsh -q define $XML_PATH
 	virsh -q start $vm	
-	virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
-	if [[ $(virsh list | grep $vm) ]]; then
-		PID=`pgrep qemu-system-x86 | tail -n 1`
-		echo $PID
-		# virsh -q save $vm ${PROJECT_ROOT%/}/$vm_snapshot
-		echo -e "\e[1;42m $vm was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
-	else
-		echo -e "\e[1;31m FAILED! $vm couldn't start up. \e[0m"
-		exit 1
-	fi
-	virsh shutdown $vm
+	qemu-img create -q -f qcow2 $DISK_PATH 500M
+	wget https://raw.githubusercontent.com/arcolife/latency_analyzer/master/disk-native.xml -O ${PROJECT_ROOT%/}/disk-native.xml
+
+	# echo -e "\e[1;33m sleeping for 10 seconds before attaching disk..\e[0m"
+	# sleep 10
+    while :; do
+		# get the IP and check if machine is up and then issue attach disk command
+    	VM_IP=$(arp -e | grep $(virsh domiflist vm2 | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+    	if [[ ! -z $status ]]; then
+			virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
+			if [[ $(virsh list | grep $vm) ]]; then
+				PID=`pgrep qemu-system-x86 | tail -n 1`
+				echo $PID
+				# virsh -q save $vm ${PROJECT_ROOT%/}/$vm_snapshot
+				# echo -e "\e[1;42m $vm was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
+			else
+				echo -e "\e[1;31m FAILED! $vm couldn't start up. \e[0m"
+				exit 1
+			fi
+
+			echo -e "\e[1;33m sleeping for 2 seconds before shutting down..\e[0m"
+			sleep 2
+			virsh shutdown $vm
+		else
+		    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
+		    sleep 2
+		fi
+    done		    		
 }
 
 run_workload(){
