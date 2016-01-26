@@ -1,5 +1,5 @@
 <disk type='file' device='disk'>
   <driver name='qemu' type='qcow2' cache='none' io='native'/>
-	<source file='/var/lib/libvirt/images/vm1.disk1.qcow2'/>
+	<source file='/var/lib/libvirt/images/vm1.disk.qcow2'/>
 	<target dev='vdb' bus='virtio'/>
 </disk>
