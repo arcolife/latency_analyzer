@@ -139,7 +139,9 @@ attach_disk(){
     	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
     	if [[ ! -z $VM_IP ]]; then
 	    	while :; do
-				echo -e "\e[1;33m Attempting to contact $vm.. \e[0m"
+				echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
+				VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+				echo -e "\e[1;33m Attempting to contact $vm at $VM_IP.. \e[0m"
 		    	IS_ALIVE=$(fping $VM_IP | grep alive)
 		    	if [[ ! -z $IS_ALIVE ]]; then
 		    		sed -i "s/vm1/$vm/g" ${PROJECT_ROOT%/}/disk-native.xml
