@@ -2,12 +2,8 @@
   <name>vm1</name>
   <memory unit='KiB'>1048576</memory>
   <vcpu placement='static'>2</vcpu>
-  <resource>
-    <partition>/machine</partition>
-  </resource>
   <os>
     <type arch='x86_64'>hvm</type>
-    <boot dev='hd'/>
   </os>
   <on_poweroff>destroy</on_poweroff>
   <on_reboot>restart</on_reboot>
@@ -22,31 +18,23 @@
       <driver name='qemu' type='qcow2'/>
       <source file='/var/lib/libvirt/images/vm1.qcow2'/>
       <target dev='vda' bus='virtio'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x08' function='0x0'/> 
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' cache='none' io='native'/>
+      <source file='/var/lib/libvirt/images/vm1.disk.qcow2'/>
+      <target dev='vdb' bus='virtio'/>
     </disk>
     <interface type='bridge'>
       <source bridge='virbr0'/>
-      <target dev='vnet0'/>
       <model type='virtio'/>
-      <alias name='net0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
     </interface>
     <serial type='pty'>
-      <source path='/dev/pts/2'/>
       <target port='0'/>
-      <alias name='serial0'/>
     </serial>
-    <console type='pty' tty='/dev/pts/2'>
-      <source path='/dev/pts/2'/>
+    <console type='pty'>
       <target type='serial' port='0'/>
-      <alias name='serial0'/>
     </console>
-    <memballoon model='virtio'>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
-    </memballoon>
   </devices>
-  <seclabel type='dynamic' model='selinux' relabel='yes'>
-    <label>system_u:system_r:svirt_t:s0:c617,c915</label>
-    <imagelabel>system_u:object_r:svirt_image_t:s0:c617,c915</imagelabel>
-  </seclabel>
 </domain>
 

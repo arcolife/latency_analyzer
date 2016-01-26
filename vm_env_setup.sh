@@ -129,6 +129,33 @@ install_requirements(){
 	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
 }
 
+attach_disk(){
+	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/disk-native.xml -O ${PROJECT_ROOT%/}/disk-native.xml
+    while :; do
+		# get the IP and check if machine is up and then issue attach disk command
+		echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
+    	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+    	if [[ ! -z $VM_IP ]]; then
+	    	while :; do
+				echo -e "\e[1;33m Attempting to contact $vm.. \e[0m"
+		    	IS_ALIVE=$(fping $VM_IP | grep alive)
+		    	if [[ ! -z $IS_ALIVE ]]; then
+		    		sed -i "s/vm1/$vm/g" ${PROJECT_ROOT%/}/disk-native.xml
+					virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
+					break
+				else
+				    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
+				    sleep 2
+				fi
+			done
+			break
+		else
+		    echo "No IP found for $vm yet.. sleeping for 2 secs."
+		    sleep 5
+		fi
+    done	
+}
+
 bootstrap_it(){
 	# cd ${PROJECT_ROOT%/}/ && wget $ISO_LOC
 	echo -e "\e[1;33m Starting bootstrap process..\e[0m"
@@ -136,6 +163,7 @@ bootstrap_it(){
 	# virsh undefine $vm
 
 	if [[ ! -f $IMAGE_PATH ]]; then
+		XML_FLAG=0
 		qemu-img create -q -f qcow2 $IMAGE_PATH 10G
 		chown -R qemu:qemu $IMAGE_PATH
 		echo -e "\e[1;32m created qcow2 image of 10G. Next: kicking off virt-install..\e[0m"
@@ -155,6 +183,7 @@ bootstrap_it(){
 			--noreboot
 			# --cdrom=${PROJECT_ROOT%/}/$ISO_NAME\
 	else
+		XML_FLAG=1
 		wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$vm.xml -O $XML_PATH
 		if [ -f $XML_PATH ]; then
 			echo -e "\e[1;42m $PROJECT_ROOT was created; VM's XML definition saved to $XML_PATH.. \e[0m"
@@ -177,43 +206,23 @@ bootstrap_it(){
 	fi
 	echo -e "\e[1;32m created /dev/vdb (additional disk)..\e[0m"
 
-	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/disk-native.xml -O ${PROJECT_ROOT%/}/disk-native.xml
+	if [ $XML_FLAG -eq 0 ]; then
+		attach_disk
+	fi
 
-    while :; do
-		# get the IP and check if machine is up and then issue attach disk command
-		echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
-    	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
-    	if [[ ! -z $VM_IP ]]; then
-	    	while :; do
-				echo -e "\e[1;33m Attempting to contact $vm.. \e[0m"
-		    	IS_ALIVE=$(fping $VM_IP | grep alive)
-		    	if [[ ! -z $IS_ALIVE ]]; then
-		    		sed -i "s/vm1/$vm/g" ${PROJECT_ROOT%/}/disk-native.xml
-					virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
-					if [[ $(virsh list | grep $vm) ]]; then
-						PID=`pgrep qemu-system-x86 | tail -n 1`
-						echo $PID
-						# virsh -q save $vm ${PROJECT_ROOT%/}/$vm_snapshot
-						# echo -e "\e[1;42m $vm was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
-					else
-						echo -e "\e[1;31m FAILED! $vm couldn't start up. \e[0m"
-						exit 1
-					fi
+	if [[ $(virsh list | grep $vm) ]]; then
+		PID=`pgrep qemu-system-x86 | tail -n 1`
+		echo "qemu PID: $PID"
+		# virsh -q save $vm ${PROJECT_ROOT%/}/$vm_snapshot
+		# echo -e "\e[1;42m $vm was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
+	else
+		echo -e "\e[1;31m FAILED! $vm couldn't start up. \e[0m"
+		exit 1
+	fi
 
-					echo -e "\e[1;33m sleeping for 2 seconds before shutting down..\e[0m"
-					sleep 2
-					virsh shutdown $vm
-					break
-				else
-				    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
-				    sleep 2
-				fi
-			done
-		else
-		    echo "No IP found for $vm yet.. sleeping for 2 secs."
-		    sleep 2
-		fi
-    done		    		
+	echo -e "\e[1;33m sleeping for 2 seconds before shutting down..\e[0m"
+	sleep 2
+	virsh shutdown $vm
 }
 
 run_workload(){
