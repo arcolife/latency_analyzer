@@ -106,8 +106,16 @@ install_requirements(){
 		exit 1
 	fi
 
-	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
+	dnf install -q -y fping 
+	xx=`fping -h`
+	if [ $? -eq 0 ]; then
+		echo -e "\e[1;42m fping installed.. \e[0m"
+	else
+		echo -e "\e[1;31m FAILED! fping could not be installed.. \e[0m"
+		exit 1
+	fi
 
+	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
 }
 
 bootstrap_it(){
@@ -148,8 +156,9 @@ bootstrap_it(){
 	# sleep 10
     while :; do
 		# get the IP and check if machine is up and then issue attach disk command
-    	VM_IP=$(arp -e | grep $(virsh domiflist vm2 | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
-    	if [[ ! -z $status ]]; then
+    	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+    	IS_ALIVE=$(fping $VM_IP | grep alive)
+    	if [[ ! -z $IS_ALIVE ]]; then
 			virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
 			if [[ $(virsh list | grep $vm) ]]; then
 				PID=`pgrep qemu-system-x86 | tail -n 1`
