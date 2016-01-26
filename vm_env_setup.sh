@@ -1,22 +1,30 @@
 #!/bin/bash
 
-vm=vm2
-PROJECT_ROOT="/src"
-IMAGE_PATH="/var/lib/libvirt/images/$vm.qcow2"
-DISK_PATH="/var/lib/libvirt/images/$vm.disk.qcow2"
-# DISK_PATH=${PROJECT_ROOT%/}/$vm.disk1.qcow2
-XML_PATH="${PROJECT_ROOT%/}/$vm.xml"
+vm=vm1
+dist=fedora22
 ISO_NAME="Fedora-Server-DVD-x86_64-22.iso"
 ISO_LOC="https://dl.fedoraproject.org/pub/fedora/linux/releases/22/Server/x86_64/os/"
 
+PROJECT_ROOT="/src"
+IMAGE_PATH="/var/lib/libvirt/images/$vm.qcow2"
+DISK_PATH="/var/lib/libvirt/images/$vm.disk.qcow2"
+XML_PATH="${PROJECT_ROOT%/}/$vm.xml"
+
 # define client name here, ex: virbr0-xxx-xx
-CLIENTS=""
+CLIENT="virbr0"
 
 echo `ps -aef | grep qemu-system-x86`
 
 cleanup(){
-	echo "cleaning up; removing ${PROJECT_ROOT%/}/<related files>.."
-	rm -rf ${PROJECT_ROOT%/}/{kvm_io/,$vm.disk1.qcow2,$vm_snapshot,$vm.xml}
+	echo "cleaning up; removing related files.."
+	rm -rf ${PROJECT_ROOT%/}/ 
+	# rm -rf $IMAGE_PATH $DISK_PATH
+
+	xx=`virsh --version`
+	if [ $? -eq 0 ]; then
+		virsh destroy $vm
+		virsh undefine $vm
+	fi
 }
 
 user_interrupt(){
@@ -35,11 +43,13 @@ install_requirements(){
 	# create project location and download $vm.xml 
 	mkdir $PROJECT_ROOT
 	dnf install -q -y wget
-	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$vm.xml -O $XML_PATH
-	if [ -f $XML_PATH ]; then
-		echo -e "\e[1;42m $PROJECT_ROOT was created; VM's XML definition saved to $XML_PATH.. \e[0m"
+	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$dist-vm.ks -O ${PROJECT_ROOT%/}/$dist-vm.ks
+
+	if [ -f ${PROJECT_ROOT%/}/$dist-vm.ks ]; then
+		# get the kickstart file
+		echo -e "\e[1;42m $PROJECT_ROOT was created; \nAlso downloaded kickstart file to ${PROJECT_ROOT%/}/$dist-vm.ks.. \e[0m"
 	else
-		echo -e "\e[1;31m failed to create $XML_PATH \e[0m"
+		echo -e "\e[1;31m failed to download kickstart file \e[0m"
 		exit 1
 	fi
 
@@ -61,8 +71,9 @@ install_requirements(){
 	dnf copr enable -y ndokos/pbench
 	# for testing in containers, use --nogpgcheck with dnf install -q of COPR repos
 	dnf install -q -y pbench-agent
-	dnf install -q -y pbench-fio
-	sed -i 's/ver=2.2.5/ver=2.2.8/g' /opt/pbench-agent/bench-scripts/pbench_fio
+	dnf install -q -y pbench-fio fio
+	FIO_VERSION=$(/usr/bin/fio --version | sed s/fio-//g)
+	sed -i s/ver=2.2.5/ver=$FIO_VERSION/g /opt/pbench-agent/bench-scripts/pbench_fio
 	source /etc/profile.d/pbench-agent.sh
 	register-tool-set
 	which pbench_fio
@@ -119,62 +130,87 @@ install_requirements(){
 }
 
 bootstrap_it(){
-	dist=fedora22
 	# cd ${PROJECT_ROOT%/}/ && wget $ISO_LOC
-	# get the kickstart file
-	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$dist-vm.ks -O ${PROJECT_ROOT%/}/$dist-vm.ks
-
+	echo -e "\e[1;33m Starting bootstrap process..\e[0m"
 	# virsh destroy $vm
 	# virsh undefine $vm
-	# virsh -q define $XML_PATH
 
-	qemu-img create -q -f qcow2 $IMAGE_PATH 10G
-	virt-install --name=$vm \
-		--virt-type=kvm \
-		--disk format=qcow2,path=$IMAGE_PATH \
-		--vcpus=2 \
-		--ram=1024 \
-		--network bridge=virbr0 \
-		--os-type=linux \
-		--os-variant=$dist \
-		--graphics none \
-		--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
-		--initrd-inject=/src/$dist-vm.ks \
-		--serial pty \
-		--location=$ISO_LOC \
-		--noreboot
-		# --cdrom=${PROJECT_ROOT%/}/$ISO_NAME\
+	if [[ ! -f $IMAGE_PATH ]]; then
+		qemu-img create -q -f qcow2 $IMAGE_PATH 10G
+		chown -R qemu:qemu $IMAGE_PATH
+		echo -e "\e[1;32m created qcow2 image of 10G. Next: kicking off virt-install..\e[0m"
+		virt-install --name=$vm \
+			--virt-type=kvm \
+			--disk format=qcow2,path=$IMAGE_PATH \
+			--vcpus=2 \
+			--ram=1024 \
+			--network bridge=$CLIENT \
+			--os-type=linux \
+			--os-variant=$dist \
+			--graphics none \
+			--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
+			--initrd-inject=/src/$dist-vm.ks \
+			--serial pty \
+			--location=$ISO_LOC \
+			--noreboot
+			# --cdrom=${PROJECT_ROOT%/}/$ISO_NAME\
+	else
+		wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$vm.xml -O $XML_PATH
+		if [ -f $XML_PATH ]; then
+			echo -e "\e[1;42m $PROJECT_ROOT was created; VM's XML definition saved to $XML_PATH.. \e[0m"
+		else
+			echo -e "\e[1;31m failed to create $XML_PATH \e[0m"
+		fi
+		sed -i "s/vm1/$vm/g" $XML_PATH
+		virsh -q define $XML_PATH
+	fi
 
 	# dnf install libguestfs-tools-c
 	# virt-builder fedora-23 -o /var/lib/libvirt/images/$vm.qcow2 --format qcow2 --update --selinux-relabel --size 5G
 	         
 	virsh -q start $vm	
-	qemu-img create -q -f qcow2 $DISK_PATH 500M
-	wget https://raw.githubusercontent.com/arcolife/latency_analyzer/master/disk-native.xml -O ${PROJECT_ROOT%/}/disk-native.xml
+	echo -e "\e[1;32m started $vm..\e[0m"
 
-	# echo -e "\e[1;33m sleeping for 10 seconds before attaching disk..\e[0m"
-	# sleep 10
+	if [[ ! -f $DISK_PATH ]]; then
+		qemu-img create -q -f qcow2 $DISK_PATH 500M
+		chown -R qemu:qemu $DISK_PATH
+	fi
+	echo -e "\e[1;32m created /dev/vdb (additional disk)..\e[0m"
+
+	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/disk-native.xml -O ${PROJECT_ROOT%/}/disk-native.xml
+
     while :; do
 		# get the IP and check if machine is up and then issue attach disk command
+		echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
     	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
-    	IS_ALIVE=$(fping $VM_IP | grep alive)
-    	if [[ ! -z $IS_ALIVE ]]; then
-			virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
-			if [[ $(virsh list | grep $vm) ]]; then
-				PID=`pgrep qemu-system-x86 | tail -n 1`
-				echo $PID
-				# virsh -q save $vm ${PROJECT_ROOT%/}/$vm_snapshot
-				# echo -e "\e[1;42m $vm was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
-			else
-				echo -e "\e[1;31m FAILED! $vm couldn't start up. \e[0m"
-				exit 1
-			fi
+    	if [[ ! -z $VM_IP ]]; then
+	    	while :; do
+				echo -e "\e[1;33m Attempting to contact $vm.. \e[0m"
+		    	IS_ALIVE=$(fping $VM_IP | grep alive)
+		    	if [[ ! -z $IS_ALIVE ]]; then
+		    		sed -i "s/vm1/$vm/g" ${PROJECT_ROOT%/}/disk-native.xml
+					virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
+					if [[ $(virsh list | grep $vm) ]]; then
+						PID=`pgrep qemu-system-x86 | tail -n 1`
+						echo $PID
+						# virsh -q save $vm ${PROJECT_ROOT%/}/$vm_snapshot
+						# echo -e "\e[1;42m $vm was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
+					else
+						echo -e "\e[1;31m FAILED! $vm couldn't start up. \e[0m"
+						exit 1
+					fi
 
-			echo -e "\e[1;33m sleeping for 2 seconds before shutting down..\e[0m"
-			sleep 2
-			virsh shutdown $vm
+					echo -e "\e[1;33m sleeping for 2 seconds before shutting down..\e[0m"
+					sleep 2
+					virsh shutdown $vm
+					break
+				else
+				    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
+				    sleep 2
+				fi
+			done
 		else
-		    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
+		    echo "No IP found for $vm yet.. sleeping for 2 secs."
 		    sleep 2
 		fi
     done		    		
