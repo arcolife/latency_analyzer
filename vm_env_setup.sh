@@ -13,7 +13,7 @@ XML_PATH="${PROJECT_ROOT%/}/$vm.xml"
 # define client name here, ex: virbr0-xxx-xx
 CLIENT="virbr0"
 
-echo `ps -aef | grep qemu-system-x86`
+echo `ps -aef |  egrep 'qemu-kvm|qemu-system-x86_64'`
 
 cleanup(){
 	echo "cleaning up; removing related files.."
@@ -22,7 +22,9 @@ cleanup(){
 
 	xx=`virsh --version`
 	if [ $? -eq 0 ]; then
-		virsh destroy $vm
+		if [[ ! -z $(virsh list | grep running) ]]; then
+			virsh destroy $vm
+		fi
 		virsh undefine $vm
 	fi
 }
@@ -159,8 +161,6 @@ attach_disk(){
 bootstrap_it(){
 	# cd ${PROJECT_ROOT%/}/ && wget $ISO_LOC
 	echo -e "\e[1;33m Starting bootstrap process..\e[0m"
-	# virsh destroy $vm
-	# virsh undefine $vm
 
 	if [[ ! -f $IMAGE_PATH ]]; then
 		XML_FLAG=0
@@ -197,21 +197,21 @@ bootstrap_it(){
 	# dnf install libguestfs-tools-c
 	# virt-builder fedora-23 -o /var/lib/libvirt/images/$vm.qcow2 --format qcow2 --update --selinux-relabel --size 5G
 	         
+	if [[ ! -f $DISK_PATH ]]; then
+		qemu-img create -q -f qcow2 $DISK_PATH 1G
+		chown -R qemu:qemu $DISK_PATH
+		echo -e "\e[1;32m created /dev/vdb (additional disk)..\e[0m"
+	fi
+	
 	virsh -q start $vm	
 	echo -e "\e[1;32m started $vm..\e[0m"
-
-	if [[ ! -f $DISK_PATH ]]; then
-		qemu-img create -q -f qcow2 $DISK_PATH 500M
-		chown -R qemu:qemu $DISK_PATH
-	fi
-	echo -e "\e[1;32m created /dev/vdb (additional disk)..\e[0m"
 
 	if [ $XML_FLAG -eq 0 ]; then
 		attach_disk
 	fi
 
 	if [[ $(virsh list | grep $vm) ]]; then
-		PID=`pgrep qemu-system-x86 | tail -n 1`
+		PID=`pgrep 'qemu-kvm|qemu-system-x86' | tail -n 1`
 		echo "qemu PID: $PID"
 		# virsh -q save $vm ${PROJECT_ROOT%/}/$vm_snapshot
 		# echo -e "\e[1;42m $vm was running with PID $PID ..snapshot saved to $PROJECT_ROOT \e[0m"
@@ -222,24 +222,43 @@ bootstrap_it(){
 
 	echo -e "\e[1;33m sleeping for 2 seconds before shutting down..\e[0m"
 	sleep 2
-	virsh shutdown $vm
+
+	# TODO: figure out why it takes time to exec shutdown signal; 
+	#		destroy for now. Use XML to define next time.
+	# virsh shutdown $vm
+	# OR use this:
+	# /src/kvm_io/shutdown-all-vms
+	virsh destroy $vm
+	# virsh undefine $vm
 }
 
 run_workload(){
 	# run kvm_io/bench_iter.sh
+	echo -e "\e[1;33m Running workload..\e[0m"
 	virsh start $vm
+	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
 	# virsh restore ${PROJECT_ROOT%/}/$vm_snapshot
 	# qemu-img info master.qcow2
 	cd ${PROJECT_ROOT%/}/kvm_io/
 	chmod +x bench_iter.sh
-	./bench_iter.sh
+
+	# TODO: add ssh keys 
+	./bench_iter.sh $VM_IP
+
+	virsh destroy $vm
 }
 
 process_data(){
 	# see if we can graph the results nicely
-	echo
+	echo -e "\e[1;33m Processing data (analyzing latency)..\e[0m"
+	# TODO: modify /etc/delta_processor.conf
+	# set the below paths / commands to run in loop over a debug data:
+	# DATA_PATH = 
+	# perf_script_processor -t 0 -p $DATA_PATH
 }
 
+# TODO: provide option to select whether to 
+# 		run benchmark directly or bootstrap first
 install_requirements
 bootstrap_it
 # run_workload
