@@ -1,0 +1,26 @@
+
+**********************
+Unique metrics found:
+	sys__pread64
+	sys__ppoll
+	kvm_inj_virq
+	kvm___
+**********************
+delta:sys_exit_ppoll__kvm_exit stats:
+	Standard Dev: 0.006560810957
+	Mean: 0.000511747629927
+	Median: 0.00044499989599
+======================
+delta:sys_enter_pread64__sys_exit_ppoll stats:
+	Standard Dev: 0.000122675554064
+	Mean: 0.000511400397293
+	Median: 0.000506000127643
+======================
+delta:sys_exit_pread64__sys_enter_pread64 stats:
+	Standard Dev: 1.43658373724e-05
+	Mean: 5.47543950038e-05
+	Median: 4.69996593893e-05
+======================
+Script was executed with Mode option 3.
+Results have been stored to: .
+Time taken -- prepare_delta() -- 3.25061893463

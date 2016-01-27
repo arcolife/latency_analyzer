@@ -1,0 +1,37 @@
+
+**********************
+Unique metrics found:
+	sys__ppoll
+	kvm_inj_virq
+	sys__io_getevents
+	sys__io_submit
+	kvm___
+**********************
+delta:sys_exit_ppoll__kvm_exit stats:
+	Standard Dev: 0.00342100900069
+	Mean: 0.000479221480431
+	Median: 0.000440999865532
+======================
+delta:sys_enter_io_submit__sys_exit_ppoll stats:
+	Standard Dev: 0.000115608397017
+	Mean: 0.000507174928282
+	Median: 0.000504000112414
+======================
+delta:sys_exit_io_submit__sys_enter_io_submit stats:
+	Standard Dev: 3.39735910162e-06
+	Mean: 8.22902781554e-06
+	Median: 8.00006091595e-06
+======================
+delta:sys_enter_io_getevents__sys_exit_io_submit stats:
+	Standard Dev: 8.17078906469e-05
+	Mean: 0.000930366457401
+	Median: 0.00092599960044
+======================
+delta:sys_exit_io_getevents__sys_enter_io_getevents stats:
+	Standard Dev: 5.48986566441e-07
+	Mean: 1.80156759849e-06
+	Median: 2.00001522899e-06
+======================
+Script was executed with Mode option 0.
+Results have been stored to: .
+Time taken -- prepare_delta() -- 3.54508090019
