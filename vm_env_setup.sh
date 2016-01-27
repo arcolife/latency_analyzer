@@ -56,34 +56,43 @@ install_requirements(){
 	fi
 
 	# install virsh components
-	dnf install -q -y @virtualization
-	systemctl start libvirtd
-	systemctl enable libvirtd
-	virsh --version
-	if [ $? -eq 0 ]; then
-		echo -e "\e[1;42m virtualization components installed.. \e[0m"
-	else
-		echo -e "\e[1;31m FAILED! virtualization modules could not be installed.. \e[0m"
-		exit 1
+	rpm -q libvirt
+	if [ $? -eq 1 ]; then
+		dnf install -q -y @virtualization
+		systemctl start libvirtd
+		systemctl enable libvirtd
+		virsh --version
+		if [ $? -eq 0 ]; then
+			echo -e "\e[1;42m virtualization components installed.. \e[0m"
+		else
+			echo -e "\e[1;31m FAILED! virtualization modules could not be installed.. \e[0m"
+			exit 1
+		fi
+	fi
+	# install pbench and fio
+	rpm -q dnf-plugins-core
+	if [ $? -eq 1 ]; then
+		dnf install -q -y dnf-plugins-core
 	fi
 
-	# install pbench and fio
-	dnf install -q -y dnf-plugins-core
-	dnf copr enable -y ndokos/configtools
-	dnf copr enable -y ndokos/pbench
-	# for testing in containers, use --nogpgcheck with dnf install -q of COPR repos
-	dnf install -q -y pbench-agent
-	dnf install -q -y pbench-fio fio
-	FIO_VERSION=$(/usr/bin/fio --version | sed s/fio-//g)
-	sed -i s/ver=2.2.5/ver=$FIO_VERSION/g /opt/pbench-agent/bench-scripts/pbench_fio
-	source /etc/profile.d/pbench-agent.sh
-	register-tool-set
-	which pbench_fio
-	if [ $? -eq 0 ]; then
-		echo -e "\e[1;42m pbench/fio installed.. \e[0m"
-	else
-		echo -e "\e[1;31m FAILED! Pbench could not be installed.. \e[0m"
-		exit 1
+	rpm -q pbench-agent pbench-fio fio
+	if [ $? -eq 1 ]; then
+		dnf copr enable -y ndokos/configtools
+		dnf copr enable -y ndokos/pbench
+		# for testing in containers, use --nogpgcheck with dnf install -q of COPR repos
+		dnf install -q -y pbench-agent
+		dnf install -q -y pbench-fio fio
+		FIO_VERSION=$(/usr/bin/fio --version | sed s/fio-//g)
+		sed -i s/ver=2.2.5/ver=$FIO_VERSION/g /opt/pbench-agent/bench-scripts/pbench_fio
+		source /etc/profile.d/pbench-agent.sh
+		register-tool-set
+		which pbench_fio
+		if [ $? -eq 0 ]; then
+			echo -e "\e[1;42m pbench/fio installed.. \e[0m"
+		else
+			echo -e "\e[1;31m FAILED! Pbench could not be installed.. \e[0m"
+			exit 1
+		fi
 	fi
 
 	# install perf-script-postprocessor
@@ -97,7 +106,11 @@ install_requirements(){
 	fi
 
 	# setup git and clone https://github.com/psuriset/kvm_io.git
-	dnf install -q -y git 
+	rpm -q git
+	if [ $? -eq 1 ]; then
+		dnf install -q -y git 
+	fi
+
 	git clone -q https://github.com/psuriset/kvm_io.git ${PROJECT_ROOT%/}/kvm_io
 
 	if [ -f ${PROJECT_ROOT%/}/kvm_io/bench_iter.sh ]; then
@@ -110,22 +123,28 @@ install_requirements(){
 	# install blockIO trace/debug tools
 	# strace, perf trace, perf record, perf trace record
 	# pbench installs perf; but just to be sure..
-	dnf install -q -y strace perf
-	xx=`perf --help && strace -h`
-	if [ $? -eq 0 ]; then
-		echo -e "\e[1;42m Debuggers: perf & strace installed.. \e[0m"
-	else
-		echo -e "\e[1;31m FAILED! perf/strace could not be installed.. \e[0m"
-		exit 1
+	rpm -q strace perf
+	if [ $? -eq 1 ]; then
+		dnf install -q -y strace perf
+		xx=`perf --help && strace -h`
+		if [ $? -eq 0 ]; then
+			echo -e "\e[1;42m Debuggers: perf & strace installed.. \e[0m"
+		else
+			echo -e "\e[1;31m FAILED! perf/strace could not be installed.. \e[0m"
+			exit 1
+		fi
 	fi
 
-	dnf install -q -y fping 
-	xx=`fping -h`
-	if [ $? -eq 0 ]; then
-		echo -e "\e[1;42m fping installed.. \e[0m"
-	else
-		echo -e "\e[1;31m FAILED! fping could not be installed.. \e[0m"
-		exit 1
+	rpm -q fping
+	if [ $? -eq 1 ]; then
+		dnf install -q -y fping 
+		xx=`fping -h`
+		if [ $? -eq 0 ]; then
+			echo -e "\e[1;42m fping installed.. \e[0m"
+		else
+			echo -e "\e[1;31m FAILED! fping could not be installed.. \e[0m"
+			exit 1
+		fi
 	fi
 
 	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
@@ -136,13 +155,17 @@ attach_disk(){
     while :; do
 		# get the IP and check if machine is up and then issue attach disk command
 		echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
-    	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
-    	if [[ ! -z $VM_IP ]]; then
-	    	while :; do
-				echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
-				VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
-				echo -e "\e[1;33m Attempting to contact $vm at $VM_IP.. \e[0m"
-		    	IS_ALIVE=$(fping $VM_IP | grep alive)
+		VM_IPS=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+    	if [[ ! -z $VM_IPS ]]; then
+			array=($VM_IPS)
+			for CURR_IP in "${array[@]}"; do
+	    	# VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+	    	# while :; do
+				# echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
+				# VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+				echo -e "\e[1;33m Attempting to contact $vm at $CURR_IP.. \e[0m"
+		    	# IS_ALIVE=$(fping $CURR_IP | grep alive)
+		    	IS_ALIVE=$(ping $CURR_IP -c 1 -W 2 | grep "1 received")
 		    	if [[ ! -z $IS_ALIVE ]]; then
 		    		sed -i "s/vm1/$vm/g" ${PROJECT_ROOT%/}/disk-native.xml
 					virsh attach-device $vm ${PROJECT_ROOT%/}/disk-native.xml --persistent
@@ -151,12 +174,14 @@ attach_disk(){
 				    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
 				    sleep 2
 				fi
-			done
-			break
+			# done
+	    	done
 		else
 		    echo "No IP found for $vm yet.. sleeping for 2 secs."
 		    sleep 5
+		    continue
 		fi
+		break
     done	
 }
 
@@ -169,21 +194,33 @@ bootstrap_it(){
 		qemu-img create -q -f qcow2 $IMAGE_PATH 10G
 		chown -R qemu:qemu $IMAGE_PATH
 		echo -e "\e[1;32m created qcow2 image of 10G. Next: kicking off virt-install..\e[0m"
-		virt-install --name=$vm \
-			--virt-type=kvm \
-			--disk format=qcow2,path=$IMAGE_PATH \
-			--vcpus=2 \
-			--ram=1024 \
-			--network bridge=$CLIENT \
-			--os-type=linux \
-			--os-variant=$dist \
-			--graphics none \
-			--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
-			--initrd-inject=/src/$dist-vm.ks \
-			--serial pty \
-			--location=$ISO_LOC \
-			--noreboot
-			# --cdrom=${PROJECT_ROOT%/}/$ISO_NAME\
+		echo $1
+		if [[ ! -z $1 ]]; then
+			virt-install --name=$vm \
+				--virt-type=kvm \
+				--disk format=qcow2,path=$IMAGE_PATH \
+				--vcpus=2 --ram=1024 --network bridge=$CLIENT --os-type=linux \
+				--os-variant=$dist --graphics none --serial pty  --noreboot \
+				--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
+				--initrd-inject=/src/$dist-vm.ks \
+				--location $1
+		else			
+			virt-install --name=$vm \
+				--virt-type=kvm \
+				--disk format=qcow2,path=$IMAGE_PATH \
+				--vcpus=2 \
+				--ram=1024 \
+				--network bridge=$CLIENT \
+				--os-type=linux \
+				--os-variant=$dist \
+				--graphics none \
+				--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
+				--initrd-inject=/src/$dist-vm.ks \
+				--serial pty \
+				--location=$ISO_LOC \
+				--noreboot
+				# --cdrom=${PROJECT_ROOT%/}/$ISO_NAME\
+		fi
 	else
 		XML_FLAG=1
 		wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$vm.xml -O $XML_PATH
@@ -231,6 +268,7 @@ bootstrap_it(){
 	# OR use this:
 	# /src/kvm_io/shutdown-all-vms
 	virsh destroy $vm
+
 	# virsh undefine $vm
 }
 
@@ -262,6 +300,6 @@ process_data(){
 # TODO: provide option to select whether to 
 # 		run benchmark directly or bootstrap first
 install_requirements
-bootstrap_it
+bootstrap_it $1
 # run_workload
 # process_data
