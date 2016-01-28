@@ -1,24 +1,8 @@
 #!/bin/bash
 
-vm=vm1
-dist=fedora22
-ISO_NAME="Fedora-Server-DVD-x86_64-22.iso"
-ISO_LOC="https://dl.fedoraproject.org/pub/fedora/linux/releases/22/Server/x86_64/os/"
-
-PROJECT_ROOT="/src"
-IMAGE_PATH="/var/lib/libvirt/images/$vm.qcow2"
-DISK_PATH="/var/lib/libvirt/images/$vm.disk.qcow2"
-XML_PATH="${PROJECT_ROOT%/}/$vm.xml"
-
-# define client name here, ex: virbr0-xxx-xx
-CLIENT="virbr0"
-
-echo `ps -aef |  egrep 'qemu-kvm|qemu-system-x86_64'`
-
 cleanup(){
 	echo "cleaning up; removing related files.."
 	rm -rf ${PROJECT_ROOT%/}/ 
-	# rm -rf $IMAGE_PATH $DISK_PATH
 
 	xx=`virsh --version`
 	if [ $? -eq 0 ]; then
@@ -38,6 +22,70 @@ user_interrupt(){
 
 trap user_interrupt SIGINT
 trap user_interrupt SIGTSTP
+
+while getopts "h?v:d:l:r:s:p:o:" opt; do
+    case "$opt" in
+	h|\?)
+	    echo "Usage: # $0 [OPTIONS]"
+	    echo "Following are optional args, defaults of which are present in script itself.."
+	    echo "[-o specify functionalities as Following (default: 0)"
+	    echo -e "\t0 -> setup requirements\n\t1 -> bootstrap virsh env\n\t3 -> run workload\n\t4 -> postprocess data (visualize)]"
+	    echo "[-v vm name (default: vm1)]"
+	    echo "[-d distro name (default: fedora22) ]"
+	    echo "[-l location (iso or url to /os) (default: network based)]"
+	    echo "[-r project root (default: /src ) ]"
+	    echo "[-s directory to store latency results to.. (default: /latency_results) ]"
+	    echo "[-p path to latency results (<LATENCY_RESULT_DIR>/<benchmark results>) ]"
+	    exit 0
+	    ;;
+	o)  OPTION=$OPTARG
+	    ;;
+	v)  vm=$OPTARG
+	    ;;
+	d)  dist=$OPTARG
+	    ;;
+	l)  ISO_LOC=$OPTARG
+	    ;;
+	r)  PROJECT_ROOT=$OPTARG
+	    ;;
+	s)  DIR_SRC=$OPTARG
+	    ;;	    
+    esac
+done
+
+if [[ -z $OPTION ]]; then
+	OPTION=0
+fi
+
+if [[ -z $vm ]]; then
+	vm=vm1
+fi
+
+if [[ -z $dist ]]; then
+	dist=fedora22
+fi
+
+if [[ -z $ISO_LOC ]]; then
+	ISO_LOC="https://dl.fedoraproject.org/pub/fedora/linux/releases/22/Server/x86_64/os/"
+fi
+
+if [[ -z $PROJECT_ROOT ]]; then
+	PROJECT_ROOT="/src"
+fi
+
+if [[ -z $DIR_SRC ]]; then
+	LATENCY_RESULT_DIR="/latency_results"
+fi
+
+# define client name here, ex: virbr0-xxx-xx
+CLIENT="virbr0"
+
+IMAGE_PATH="/var/lib/libvirt/images/$vm.qcow2"
+DISK_PATH="/var/lib/libvirt/images/$vm.disk.qcow2"
+
+XML_PATH="${PROJECT_ROOT%/}/$vm.xml"
+
+echo `ps -aef |  egrep 'qemu-kvm|qemu-system-x86_64'`
 
 install_requirements(){
 	cleanup
@@ -111,14 +159,21 @@ install_requirements(){
 		dnf install -q -y git 
 	fi
 
-	git clone -q https://github.com/psuriset/kvm_io.git ${PROJECT_ROOT%/}/kvm_io
-
+	# check for kvm_io repo
 	if [ -f ${PROJECT_ROOT%/}/kvm_io/bench_iter.sh ]; then
-		echo -e "\e[1;42m ${PROJECT_ROOT%/}/kvm_io was created.. \e[0m"
+		echo -e "\e[1;42m ${PROJECT_ROOT%/}/kvm_io exists.. \e[0m"
 	else
-		echo -e "\e[1;31m failed to create ${PROJECT_ROOT%/}/kvm_io \e[0m"
-		exit 1
+		git clone -q https://github.com/psuriset/kvm_io.git ${PROJECT_ROOT%/}/kvm_io
+		if [ -f ${PROJECT_ROOT%/}/kvm_io/bench_iter.sh ]; then
+			echo -e "\e[1;42m ${PROJECT_ROOT%/}/kvm_io was created.. \e[0m"
+		else
+			echo -e "\e[1;31m failed to create ${PROJECT_ROOT%/}/kvm_io \e[0m"
+			exit 1
+		fi
 	fi
+	cp ${PROJECT_ROOT%/}/kvm_io/avg-stddev /usr/local/bin/avg-stddev
+	cp ${PROJECT_ROOT%/}/kvm_io/bench_iter.sh /usr/local/bin/bench_iter
+	chmod +x /usr/local/bin/{bench_iter,avg-stddev}
 
 	# install blockIO trace/debug tools
 	# strace, perf trace, perf record, perf trace record
@@ -135,17 +190,17 @@ install_requirements(){
 		fi
 	fi
 
-	rpm -q fping
-	if [ $? -eq 1 ]; then
-		dnf install -q -y fping 
-		xx=`fping -h`
-		if [ $? -eq 0 ]; then
-			echo -e "\e[1;42m fping installed.. \e[0m"
-		else
-			echo -e "\e[1;31m FAILED! fping could not be installed.. \e[0m"
-			exit 1
-		fi
-	fi
+	# rpm -q fping
+	# if [ $? -eq 1 ]; then
+	# 	dnf install -q -y fping 
+	# 	xx=`fping -h`
+	# 	if [ $? -eq 0 ]; then
+	# 		echo -e "\e[1;42m fping installed.. \e[0m"
+	# 	else
+	# 		echo -e "\e[1;31m FAILED! fping could not be installed.. \e[0m"
+	# 		exit 1
+	# 	fi
+	# fi
 
 	echo -e "\e[1;32m ALL requirements satisfied.. \e[0m"
 }
@@ -159,10 +214,6 @@ attach_disk(){
     	if [[ ! -z $VM_IPS ]]; then
 			array=($VM_IPS)
 			for CURR_IP in "${array[@]}"; do
-	    	# VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
-	    	# while :; do
-				# echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
-				# VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
 				echo -e "\e[1;33m Attempting to contact $vm at $CURR_IP.. \e[0m"
 		    	# IS_ALIVE=$(fping $CURR_IP | grep alive)
 		    	IS_ALIVE=$(ping $CURR_IP -c 1 -W 2 | grep "1 received")
@@ -194,33 +245,20 @@ bootstrap_it(){
 		qemu-img create -q -f qcow2 $IMAGE_PATH 10G
 		chown -R qemu:qemu $IMAGE_PATH
 		echo -e "\e[1;32m created qcow2 image of 10G. Next: kicking off virt-install..\e[0m"
-		echo $1
-		if [[ ! -z $1 ]]; then
-			virt-install --name=$vm \
-				--virt-type=kvm \
-				--disk format=qcow2,path=$IMAGE_PATH \
-				--vcpus=2 --ram=1024 --network bridge=$CLIENT --os-type=linux \
-				--os-variant=$dist --graphics none --serial pty  --noreboot \
-				--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
-				--initrd-inject=/src/$dist-vm.ks \
-				--location $1
-		else			
-			virt-install --name=$vm \
-				--virt-type=kvm \
-				--disk format=qcow2,path=$IMAGE_PATH \
-				--vcpus=2 \
-				--ram=1024 \
-				--network bridge=$CLIENT \
-				--os-type=linux \
-				--os-variant=$dist \
-				--graphics none \
-				--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
-				--initrd-inject=/src/$dist-vm.ks \
-				--serial pty \
-				--location=$ISO_LOC \
-				--noreboot
-				# --cdrom=${PROJECT_ROOT%/}/$ISO_NAME\
-		fi
+		virt-install --name=$vm \
+			--virt-type=kvm \
+			--disk format=qcow2,path=$IMAGE_PATH \
+			--vcpus=2 \
+			--ram=1024 \
+			--network bridge=$CLIENT \
+			--os-type=linux \
+			--os-variant=$dist \
+			--graphics none \
+			--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
+			--initrd-inject=/src/$dist-vm.ks \
+			--serial pty \
+			--location=$ISO_LOC \
+			--noreboot
 	else
 		XML_FLAG=1
 		wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$vm.xml -O $XML_PATH
@@ -276,14 +314,34 @@ run_workload(){
 	# run kvm_io/bench_iter.sh
 	echo -e "\e[1;33m Running workload..\e[0m"
 	virsh start $vm
-	VM_IP=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+
+    while :; do
+		# get the IP and check if machine is up and then issue attach disk command
+		echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
+		VM_IPS=$(arp -e | grep $(virsh domiflist $vm | tail -n 2  | head -n 1 | awk -F' ' '{print $NF}') | tail -n 1 | awk -F' ' '{print $1}')
+    	if [[ ! -z $VM_IPS ]]; then
+			array=($VM_IPS)
+			for CURR_IP in "${array[@]}"; do
+	    		echo -e "\e[1;33m Attempting to contact $vm at $CURR_IP.. \e[0m"
+		    	IS_ALIVE=$(ping $CURR_IP -c 1 -W 2 | grep "1 received")
+		    	if [[ ! -z $IS_ALIVE ]]; then					
+					/usr/local/bin/bench_iter -i $CURR_IP -o $LATENCY_RESULT_DIR 
+					break
+				else
+				    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
+				    sleep 2
+				fi
+			# done
+	    	done
+		else
+		    echo "No IP found for $vm yet.. sleeping for 2 secs."
+		    sleep 5
+		    continue
+		fi
+		break
+    done	
 	# virsh restore ${PROJECT_ROOT%/}/$vm_snapshot
 	# qemu-img info master.qcow2
-	cd ${PROJECT_ROOT%/}/kvm_io/
-	chmod +x bench_iter.sh
-
-	# TODO: add ssh keys 
-	./bench_iter.sh $VM_IP
 
 	virsh destroy $vm
 }
@@ -291,6 +349,8 @@ run_workload(){
 process_data(){
 	# see if we can graph the results nicely
 	echo -e "\e[1;33m Processing data (analyzing latency)..\e[0m"
+
+	cd ${PROJECT_ROOT%/}/kvm_io/
 	# TODO: modify /etc/delta_processor.conf
 	# set the below paths / commands to run in loop over a debug data:
 	# DATA_PATH = 
@@ -299,7 +359,19 @@ process_data(){
 
 # TODO: provide option to select whether to 
 # 		run benchmark directly or bootstrap first
-install_requirements
-bootstrap_it $1
-# run_workload
-# process_data
+
+if [ $OPTION -eq 0 ]; then
+	install_requirements
+elif [ $OPTION -eq 1 ]; then
+	install_requirements
+	bootstrap_it
+elif [ $OPTION -eq 2 ]; then 
+	run_workload
+elif [ $OPTION -eq 3 ]; then 
+	process_data
+else
+	install_requirements
+	bootstrap_it
+	run_workload
+	process_data
+fi
