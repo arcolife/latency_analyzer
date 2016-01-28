@@ -14,7 +14,8 @@ lang en_US.UTF-8
 # Network information
 network  --bootproto=dhcp --device=eth0 --ipv6=auto --activate
 # Root password
-rootpw --iscrypted $6$u/KnxAzbRwPmTlO5$hZ.lPbgaDh3Y8XZlDU7R34.yjE9UKsiWR73IOTn/M2cHqKvW5piJrx3FXsibcHFG1Yq3PkQHnZTbC6G.4LEwk/
+rootpw --iscrypted $6$devconf16$bZCWfUNjasD/0ZfvnPhifOV/nzyaThWun7Skjs4oaab9CkVk2FzEBQKf6olWkZYWrC0d7EsVXbrSMqEtOGW100
+
 # Do not configure the X Window System
 skipx
 # System timezone
@@ -43,6 +44,8 @@ sed -i s/ver=2.2.5/ver=$FIO_VERSION/g /opt/pbench-agent/bench-scripts/pbench_fio
 source /etc/profile.d/pbench-agent.sh
 register-tool-set
 # dnf -y update
+# sed -i -e s/^HWADDR.*// /etc/sysconfig/network-scripts/ifcfg-eth0
+# /bin/rm -f /etc/hostname
 %end
 
 shutdown
