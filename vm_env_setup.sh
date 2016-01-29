@@ -153,6 +153,7 @@ install_requirements(){
 		dnf install -q -y redhat-rpm-config
 	fi
 
+	echo "..attempting to install perf-script-postprocessor"
 	pip2 install -q perf-script-postprocessor
 	if [ $? -eq 0 ]; then
 		perf_script_processor -h

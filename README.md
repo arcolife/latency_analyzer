@@ -30,8 +30,9 @@ print crypt.crypt('#devconf16', '\$6\devconf16\$')" ```
 Please install the following for your kernel version
 (check through `uname -a`), before continuing..
 
-       - kernel-debuginfo-common
-       - kernel-debuginfo
+       - kernel-debuginfo-common | f23 | [4.3.3-303](ftp://195.220.108.108/linux/fedora/linux/updates/23/x86_64/debug/k/kernel-debuginfo-common-x86_64-4.3.3-303.fc23.x86_64.rpm)
+
+       - kernel-debuginfo | f23 [4.3.3-303](ftp://195.220.108.108/linux/fedora/linux/updates/23/x86_64/debug/k/kernel-debuginfo-4.3.3-303.fc23.x86_64.rpm)
 
 After starting up the vm (refer to USAGE section),
 add your host's id_rsa.pub to guest's authorized keys.
