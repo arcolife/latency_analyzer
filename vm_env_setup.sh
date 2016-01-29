@@ -106,9 +106,9 @@ install_requirements(){
 	fi
 
 	# install virsh components
-	rpm -q libvirt
-	if [ $? -eq 1 ]; then
-		dnf install -q -y @virtualization
+	rpm -q libvirt qemu-kvm
+	if [ ! $? -eq 0 ]; then
+		dnf install -q -y @virtualization libvirtd
 		systemctl start libvirtd
 		systemctl enable libvirtd
 		virsh --version
@@ -121,12 +121,12 @@ install_requirements(){
 	fi
 	# install pbench and fio
 	rpm -q dnf-plugins-core
-	if [ $? -eq 1 ]; then
+	if [ ! $? -eq 0 ]; then
 		dnf install -q -y dnf-plugins-core
 	fi
 
 	rpm -q pbench-agent pbench-fio fio
-	if [ $? -eq 1 ]; then
+	if [ ! $? -eq 0 ]; then
 		dnf copr enable -y ndokos/configtools
 		dnf copr enable -y ndokos/pbench
 		# for testing in containers, use --nogpgcheck with dnf install -q of COPR repos
@@ -147,17 +147,22 @@ install_requirements(){
 
 	# install perf-script-postprocessor
 	pip2 install -q perf-script-postprocessor
-	perf_script_processor -h
 	if [ $? -eq 0 ]; then
-		echo -e "\e[1;42m perf-script-postprocessor installed.. \e[0m"
+		perf_script_processor -h
+		if [ $? -eq 0 ]; then
+			echo -e "\e[1;42m perf-script-postprocessor installed.. \e[0m"
+		else
+			echo -e "\e[1;31m FAILED! perf-script-postprocessor could not be installed.. \e[0m"
+			exit 1
+		fi
 	else
-		echo -e "\e[1;31m FAILED! perf-script-postprocessor could not be installed.. \e[0m"
+		echo -e "\e[1;31m FAILED! pip not working correctly.. \e[0m"
 		exit 1
 	fi
 
 	# setup git and clone https://github.com/psuriset/kvm_io.git
 	rpm -q git
-	if [ $? -eq 1 ]; then
+	if [ ! $? -eq 0 ]; then
 		dnf install -q -y git 
 	fi
 
@@ -181,7 +186,7 @@ install_requirements(){
 	# strace, perf trace, perf record, perf trace record
 	# pbench installs perf; but just to be sure..
 	rpm -q strace perf
-	if [ $? -eq 1 ]; then
+	if [ ! $? -eq 0 ]; then
 		dnf install -q -y strace perf
 		xx=`perf --help && strace -h`
 		if [ $? -eq 0 ]; then
@@ -193,7 +198,7 @@ install_requirements(){
 	fi
 
 	# rpm -q fping
-	# if [ $? -eq 1 ]; then
+	# if [ ! $? -eq 0 ]; then
 	# 	dnf install -q -y fping 
 	# 	xx=`fping -h`
 	# 	if [ $? -eq 0 ]; then
