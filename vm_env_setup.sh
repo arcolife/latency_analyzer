@@ -145,6 +145,9 @@ install_requirements(){
 		fi
 	fi
 
+	echo -e "\e[1;36m ..attempting to install perf-script-postprocessor.\e[0m"
+	echo -e "\e[1;36m This might take a few mins, given the deps. Enjoy a cup of coffee meanwhile.\e[0m"
+
 	# install perf-script-postprocessor
 	rpm -q gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas
 	if [ ! $? -eq 0 ]; then
@@ -153,7 +156,6 @@ install_requirements(){
 		dnf install -q -y redhat-rpm-config
 	fi
 
-	echo "..attempting to install perf-script-postprocessor"
 	pip2 install -q perf-script-postprocessor
 	if [ $? -eq 0 ]; then
 		perf_script_processor -h
