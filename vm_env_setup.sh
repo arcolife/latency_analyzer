@@ -50,6 +50,8 @@ while getopts "h?v:d:l:r:s:p:o:" opt; do
 	    ;;
 	s)  DIR_SRC=$OPTARG
 	    ;;	    
+	p)	BENCH_PATH=$OPTARG
+		;;
     esac
 done
 
@@ -325,7 +327,7 @@ run_workload(){
 	    		echo -e "\e[1;33m Attempting to contact $vm at $CURR_IP.. \e[0m"
 		    	IS_ALIVE=$(ping $CURR_IP -c 1 -W 2 | grep "1 received")
 		    	if [[ ! -z $IS_ALIVE ]]; then					
-					/usr/local/bin/bench_iter -i $CURR_IP -o $LATENCY_RESULT_DIR 
+					/usr/local/bin/bench_iter -i $CURR_IP -o $LATENCY_RESULT_DIR
 					break
 				else
 				    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
@@ -350,11 +352,14 @@ process_data(){
 	# see if we can graph the results nicely
 	echo -e "\e[1;33m Processing data (analyzing latency)..\e[0m"
 
-	cd ${PROJECT_ROOT%/}/kvm_io/
-	# TODO: modify /etc/delta_processor.conf
-	# set the below paths / commands to run in loop over a debug data:
-	# DATA_PATH = 
-	# perf_script_processor -t 0 -p $DATA_PATH
+	# substitute with custom conf file
+	if [[ -z $(grep sys_exit /etc/delta_processor.conf) ]]; then
+		echo -e "\e[1;33m updating /etc/delta_processor.conf .. \e[0m"
+		wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/delta_processor.conf -O /etc/delta_processor.conf
+	fi
+
+	# TODO: set the below paths / commands to run in loop over a debug data:
+	perf_script_processor -t 0 -p $BENCH_PATH
 }
 
 # TODO: provide option to select whether to 
