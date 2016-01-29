@@ -146,6 +146,13 @@ install_requirements(){
 	fi
 
 	# install perf-script-postprocessor
+	rpm -q gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas
+	if [ ! $? -eq 0 ]; then
+		dnf install -q -y gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas
+		dnf install -q -y libffi-devel libxml-devel libxml2-devel libxslt-devel
+		dnf install -q -y redhat-rpm-config
+	fi
+
 	pip2 install -q perf-script-postprocessor
 	if [ $? -eq 0 ]; then
 		perf_script_processor -h
