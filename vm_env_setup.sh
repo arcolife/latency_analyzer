@@ -386,10 +386,9 @@ process_data(){
 	echo -e "\e[1;33m Processing data (analyzing latency)..\e[0m"
 
 	# substitute with custom conf file
-	if [[ -z $(grep sys_exit /etc/delta_processor.conf) ]]; then
-		echo -e "\e[1;33m updating /etc/delta_processor.conf .. \e[0m"
-		wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/delta_processor.conf -O /etc/delta_processor.conf
-	fi
+	echo -e "\e[1;33m backing up and updating /etc/delta_processor.conf .. \e[0m"
+	cp /etc/delta_processor.conf /etc/delta_processor.conf.bkup
+	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/delta_processor.conf -O /etc/delta_processor.conf
 
 	# TODO: set the below paths / commands to run in loop over a debug data:
 	perf_script_processor -t 0 -p $BENCH_PATH
