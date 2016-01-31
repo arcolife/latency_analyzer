@@ -9,7 +9,14 @@ cleanup(){
 		if [[ ! -z $(virsh list | grep running) ]]; then
 			virsh destroy $vm
 		fi
-		virsh undefine $vm
+	fi
+
+	if [[ ! -z $BENCH_DIR ]]; then
+		# make sure we're not busting root :P
+		if [[ ! $BENCH_DIR == / ]]; then
+			rm -rf $BENCH_DIR
+			echo "removed $BENCH_DIR"
+		fi
 	fi
 }
 
@@ -256,6 +263,7 @@ attach_disk(){
 bootstrap_it(){
 	# cd ${PROJECT_ROOT%/}/ && wget $ISO_LOC
 	echo -e "\e[1;33m Starting bootstrap process..\e[0m"
+	virsh undefine $vm	
 
 	if [[ ! -f $IMAGE_PATH ]]; then
 		XML_FLAG=0
@@ -332,6 +340,7 @@ run_workload(){
 	echo -e "\e[1;33m Running workload..\e[0m"
 	virsh start $vm
 
+	RESULT_FLAG=0
     while :; do
 		# get the IP and check if machine is up and then issue attach disk command
 		echo -e "\e[1;33m Attempting to get IP of $vm.. \e[0m"
@@ -342,20 +351,29 @@ run_workload(){
 	    		echo -e "\e[1;33m Attempting to contact $vm at $CURR_IP.. \e[0m"
 		    	IS_ALIVE=$(ping $CURR_IP -c 1 -W 2 | grep "1 received")
 		    	if [[ ! -z $IS_ALIVE ]]; then					
-					/usr/local/bin/bench_iter -i $CURR_IP -o $LATENCY_RESULT_DIR
+		    		bench_ext='native'
+	    			DIR_TAG="`date +"%m-%d-%y-%H-%M-%S_"`$bench_ext"
+					BENCH_DIR=${LATENCY_RESULT_DIR%/}/$DIR_TAG
+					/usr/local/bin/bench_iter -i $CURR_IP -b $BENCH_DIR 
+					RESULT_FLAG=1
 					break
 				else
 				    echo "VM not ready yet (can't attach disk); sleeping for 2 secs"
 				    sleep 2
+				    continue
 				fi
 			# done
 	    	done
+	    	if [[ $RESULT_FLAG -eq 1 ]]; then
+	    		break
+	    	else
+	    		continue
+	    	fi
 		else
 		    echo "No IP found for $vm yet.. sleeping for 2 secs."
 		    sleep 5
 		    continue
 		fi
-		break
     done	
 	# virsh restore ${PROJECT_ROOT%/}/$vm_snapshot
 	# qemu-img info master.qcow2
