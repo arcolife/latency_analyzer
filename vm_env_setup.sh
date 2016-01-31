@@ -391,7 +391,15 @@ process_data(){
 	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/delta_processor.conf -O /etc/delta_processor.conf
 
 	# TODO: set the below paths / commands to run in loop over a debug data:
-	perf_script_processor -t 0 -p $BENCH_PATH
+	if [[ -z $BENCH_PATH ]]; then
+		# in case, this runs in an automated fashion, i.e., 
+		# directly after run_workload() (..without user's input for -p)
+		echo "processing sample: ${BENCH_DIR%/}/1/perf_kvm_record.data"
+		perf_script_processor -t 0 -p ${BENCH_DIR%/}/1/perf_kvm_record.data
+	else
+		echo "processing sample: ${BENCH_PATH%/}/1/perf_kvm_record.data"
+		perf_script_processor -t 0 -p ${BENCH_PATH%/}/1/perf_kvm_record.data
+	fi
 }
 
 # TODO: provide option to select whether to 
@@ -407,6 +415,7 @@ elif [ $OPTION -eq 2 ]; then
 elif [ $OPTION -eq 3 ]; then 
 	process_data
 else
+	echo -e "\e[1;33m option selected is out of choice. Running all steps now then..\e[0m"
 	install_requirements
 	bootstrap_it
 	run_workload
