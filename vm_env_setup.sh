@@ -354,7 +354,7 @@ run_workload(){
 		    		bench_ext='native'
 	    			DIR_TAG="`date +"%m-%d-%y-%H-%M-%S_"`$bench_ext"
 					BENCH_DIR=${LATENCY_RESULT_DIR%/}/$DIR_TAG
-					/usr/local/bin/bench_iter -i $CURR_IP -b $BENCH_DIR 
+					/usr/local/bin/bench_iter -i $CURR_IP -b $BENCH_DIR -r 5
 					RESULT_FLAG=1
 					break
 				else
