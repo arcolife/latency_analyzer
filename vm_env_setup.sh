@@ -273,7 +273,7 @@ bootstrap_it(){
 		virt-install --name=$vm \
 			--virt-type=kvm \
 			--disk format=qcow2,path=$IMAGE_PATH \
-			--vcpus=2 \
+			--vcpus=1 \
 			--ram=1024 \
 			--network bridge=$CLIENT \
 			--os-type=linux \
@@ -300,7 +300,7 @@ bootstrap_it(){
 	# virt-builder fedora-23 -o /var/lib/libvirt/images/$vm.qcow2 --format qcow2 --update --selinux-relabel --size 5G
 	         
 	if [[ ! -f $DISK_PATH ]]; then
-		qemu-img create -q -f qcow2 $DISK_PATH 1G
+		qemu-img create -q -f qcow2 $DISK_PATH 100M
 		chown -R qemu:qemu $DISK_PATH
 		echo -e "\e[1;32m created /dev/vdb (additional disk)..\e[0m"
 	fi

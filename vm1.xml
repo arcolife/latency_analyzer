@@ -1,7 +1,7 @@
 <domain type='kvm'>
   <name>vm1</name>
   <memory unit='KiB'>1048576</memory>
-  <vcpu placement='static'>2</vcpu>
+  <vcpu placement='static'>1</vcpu>
   <os>
     <type arch='x86_64'>hvm</type>
   </os>
