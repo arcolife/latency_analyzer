@@ -280,7 +280,7 @@ bootstrap_it(){
 			--os-variant=$dist \
 			--graphics none \
 			--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
-			--initrd-inject=/src/$dist-vm.ks \
+			--initrd-inject=${PROJECT_ROOT%/}/$dist-vm.ks \
 			--serial pty \
 			--location=$ISO_LOC \
 			--noreboot
@@ -326,7 +326,7 @@ bootstrap_it(){
 	sleep 2
 
 	# TODO: figure out why it takes time to exec shutdown signal; 
-	#		destroy for now. Use XML to define next time.
+	#	destroy for now. Use XML to define next time.
 	# virsh shutdown $vm
 	# OR use this:
 	# /src/kvm_io/shutdown-all-vms
@@ -394,16 +394,14 @@ process_data(){
 	if [[ -z $BENCH_PATH ]]; then
 		# in case, this runs in an automated fashion, i.e., 
 		# directly after run_workload() (..without user's input for -p)
-		echo "processing sample: ${BENCH_DIR%/}/1/perf_kvm_record.data"
-		perf_script_processor -t 0 -p ${BENCH_DIR%/}/1/perf_kvm_record.data
+		TARGET_DIR=$BENCH_DIR
 	else
-		echo "processing sample: ${BENCH_PATH%/}/1/perf_kvm_record.data"
-		perf_script_processor -t 0 -p ${BENCH_PATH%/}/1/perf_kvm_record.data
+		TARGET_DIR=$BENCH_PATH
 	fi
+	
+	echo "processing sample: ${TARGET_DIR%/}/1/perf_kvm_record.data"		
+	perf_script_processor -t 0 -p ${TARGET_DIR%/}/1/perf_kvm_record.data
 }
-
-# TODO: provide option to select whether to 
-# 		run benchmark directly or bootstrap first
 
 if [ $OPTION -eq 0 ]; then
 	install_requirements
