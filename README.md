@@ -25,6 +25,30 @@ and change sha512 based login password using following option:
 ``` python -c "import crypt, getpass, pwd; \
 print crypt.crypt('#devconf16', '\$6\devconf16\$')" ```
 
+##DEVCONF_2016_SPECIFIC_NOTE
+
+Please note that `vm_env_setup.sh` runs perfectly on fedora 23.
+If you have other distros/versions, kindly `at least` do the following,
+to speed up the workshop:
+
+1. install the pip2 module perf-script-postprocessor.
+   You might get dependency erros on rpm based systems.
+   So install the equivalent of following packages.
+
+   ```
+   gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas
+   libffi-devel libxml-devel libxml2-devel libxslt-devel redhat-rpm-config
+   ```
+   
+2. install @Virtualization packages for your distro, as well as qemu-kvm
+   ..so we could use virsh / virt-install / qemu-kvm as accelerator..
+
+3. run the following part from vm_env_setup.sh, as following..
+
+   ```# ./handy_minimalistic.sh```
+
+Cheers.
+
 ##PREREQUISITES
 
 Please install the following for your kernel version
