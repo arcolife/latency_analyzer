@@ -280,7 +280,7 @@ bootstrap_it(){
 			--os-variant=$dist \
 			--graphics none \
 			--extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
-			--initrd-inject=/src/$dist-vm.ks \
+			--initrd-inject=${PROJECT_ROOT%/}/$dist-vm.ks \
 			--serial pty \
 			--location=$ISO_LOC \
 			--noreboot
@@ -390,16 +390,35 @@ process_data(){
 	cp /etc/delta_processor.conf /etc/delta_processor.conf.bkup
 	wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/delta_processor.conf -O /etc/delta_processor.conf
 
+	# check for FlameGraph repo
+	SAMPLE_FILE=${PROJECT_ROOT%/}/FlameGraph/stackcollapse-perf.pl
+	if [ -f $SAMPLE_FILE ]; then
+		echo -e "\e[1;42m ${PROJECT_ROOT%/}/FlameGraph exists.. \e[0m"
+	else
+		git clone -q https://github.com/brendangregg/FlameGraph.git ${PROJECT_ROOT%/}/FlameGraph	
+		if [ -f $SAMPLE_FILE ]; then
+			echo -e "\e[1;42m ${PROJECT_ROOT%/}/FlameGraph was created.. \e[0m"
+		else
+			echo -e "\e[1;31m failed to create ${PROJECT_ROOT%/}/FlameGraph \e[0m"
+			exit 1
+		fi
+	fi
+
+
 	# TODO: set the below paths / commands to run in loop over a debug data:
 	if [[ -z $BENCH_PATH ]]; then
 		# in case, this runs in an automated fashion, i.e., 
 		# directly after run_workload() (..without user's input for -p)
-		echo "processing sample: ${BENCH_DIR%/}/1/perf_kvm_record.data"
-		perf_script_processor -t 0 -p ${BENCH_DIR%/}/1/perf_kvm_record.data
+		TARGET_DIR=$BENCH_DIR
 	else
-		echo "processing sample: ${BENCH_PATH%/}/1/perf_kvm_record.data"
-		perf_script_processor -t 0 -p ${BENCH_PATH%/}/1/perf_kvm_record.data
+		TARGET_DIR=$BENCH_PATH
 	fi
+	
+	echo "processing sample: ${TARGET_DIR%/}/1/perf_kvm_record.data"		
+	perf script -i ${TARGET_DIR%/}/1/perf_kvm_record.data > ${TARGET_DIR%/}/1/raw_perf
+	${PROJECT_ROOT%/}/FlameGraph/stackcollapse-perf.pl raw_perf > out.folded
+	perf_script_processor -t 0 -p ${TARGET_DIR%/}/1/perf_kvm_record.data
+
 }
 
 # TODO: provide option to select whether to 
