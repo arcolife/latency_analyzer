@@ -163,7 +163,7 @@ install_requirements(){
 		dnf install -q -y redhat-rpm-config
 	fi
 
-	pip2 install -q perf-script-postprocessor
+	pip install -q perf-script-postprocessor
 	if [ $? -eq 0 ]; then
 		perf_script_processor -h
 		if [ $? -eq 0 ]; then
