@@ -46,6 +46,7 @@ elif [[ $OPTION -eq 1 ]]; then
   remove_vms
 else
   echo -e "\e[1;33m option selected is out of choice. Quitting..\e[0m"
+  exit -1
 fi
 
 while [ ! -z "$vms" ]; do
