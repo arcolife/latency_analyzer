@@ -1,0 +1,3 @@
+#!/bin/bash
+
+virt-clone -d -o $1 -n $2 --auto-clone
