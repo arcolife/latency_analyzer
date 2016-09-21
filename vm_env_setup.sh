@@ -115,7 +115,7 @@ install_requirements(){
 	# install virsh components
 	rpm -q libvirt qemu-kvm
 	if [ ! $? -eq 0 ]; then
-		dnf install -q -y @virtualization libvirtd
+		dnf install -q -y @virt* #libvirt-daemon
 		systemctl start libvirtd
 		systemctl enable libvirtd
 		virsh --version
@@ -132,18 +132,18 @@ install_requirements(){
 		dnf install -q -y dnf-plugins-core
 	fi
 
-	rpm -q pbench-agent pbench-fio fio
+	rpm -q pbench-agent pbench-fio #fio
 	if [ ! $? -eq 0 ]; then
 		dnf copr enable -y ndokos/configtools
 		dnf copr enable -y ndokos/pbench
 		# for testing in containers, use --nogpgcheck with dnf install -q of COPR repos
 		dnf install -q -y pbench-agent
-		dnf install -q -y pbench-fio fio
-		FIO_VERSION=$(/usr/bin/fio --version | sed s/fio-//g)
-		sed -i s/ver=2.2.5/ver=$FIO_VERSION/g /opt/pbench-agent/bench-scripts/pbench_fio
+		dnf install -q -y pbench-fio #fio
+		FIO_VERSION=$(/usr/local/bin/fio --version | sed s/fio-//g)
+		sed -i -r s/ver=.*/ver=$FIO_VERSION/g /opt/pbench-agent/bench-scripts/pbench-fio
 		source /etc/profile.d/pbench-agent.sh
-		register-tool-set
-		which pbench_fio
+		pbench-register-tool-set
+		which pbench-fio
 		if [ $? -eq 0 ]; then
 			echo -e "\e[1;42m pbench/fio installed.. \e[0m"
 		else
@@ -156,14 +156,15 @@ install_requirements(){
 	echo -e "\e[1;36m This might take a few mins, given the deps. Enjoy a cup of coffee meanwhile.\e[0m"
 
 	# install perf-script-postprocessor
-	rpm -q gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas
+	rpm -q gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas \
+	    redhat-rpm-config libffi-devel libxml-devel libxml2-devel libxslt-devel
 	if [ ! $? -eq 0 ]; then
-		dnf install -q -y gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas
-		dnf install -q -y libffi-devel libxml-devel libxml2-devel libxslt-devel
-		dnf install -q -y redhat-rpm-config
+		dnf install -y gcc lapack lapack-devel blas blas-devel gcc-gfortran gcc-c++ liblas
+		dnf install -y libffi-devel libxml-devel libxml2-devel libxslt-devel
+		dnf install -y redhat-rpm-config
 	fi
 
-	pip install -q perf-script-postprocessor
+	pip install perf-script-postprocessor
 	if [ $? -eq 0 ]; then
 		perf_script_processor -h
 		if [ $? -eq 0 ]; then

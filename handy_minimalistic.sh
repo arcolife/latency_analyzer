@@ -21,6 +21,25 @@ chown -R qemu:qemu $IMAGE_PATH
 
 wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/$dist-vm.ks -O ${PROJECT_ROOT%/}/$dist-vm.ks
 
+virt-install --name=$vm \
+    --virt-type=kvm \
+    --disk format=qcow2,path=$IMAGE_PATH \
+    --vcpus=1 \
+    --ram=1024 \
+    --network bridge=$CLIENT \
+    --os-type=linux \
+    --os-variant=$dist \
+    --graphics none \
+    --extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
+    --initrd-inject=/src/$dist-vm.ks \
+    --serial pty \
+    --location=$ISO_LOC \
+    --noreboot
+
+qemu-img create -q -f qcow2 $DISK_PATH 100M
+chown -R qemu:qemu $DISK_PATH
+echo -e "\e[1;32m created /dev/vdb (additional disk)..\e[0m"
+
 attach_disk(){
     wget -q https://raw.githubusercontent.com/arcolife/latency_analyzer/master/disk-native.xml -O ${PROJECT_ROOT%/}/disk-native.xml
     while :; do
@@ -51,26 +70,5 @@ attach_disk(){
         break
     done   
 }
-
-
-
-virt-install --name=$vm \
-    --virt-type=kvm \
-    --disk format=qcow2,path= /var/lib/libvirt/images/$vm.qcow2 \
-    --vcpus=1 \
-    --ram=1024 \
-    --network bridge=$CLIENT \
-    --os-type=linux \
-    --os-variant=$dist \
-    --graphics none \
-    --extra-args="ks=file:/$dist-vm.ks console=ttyS0,115200" \
-    --initrd-inject=/src/$dist-vm.ks \
-    --serial pty \
-    --location=$ISO_LOC \
-    --noreboot
-
-qemu-img create -q -f qcow2 $DISK_PATH 100M
-chown -R qemu:qemu $DISK_PATH
-echo -e "\e[1;32m created /dev/vdb (additional disk)..\e[0m"
 
 attach_disk
